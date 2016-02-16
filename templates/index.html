@@ -3,9 +3,25 @@
 <title>Appointments</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
+
+<!-- jquery from a content distribution network; probably cached -->
+<script type="text/javascript"
+     src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js">
+</script>
+
+
+
+<script type="text/javascript" 
+    src="//cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>
+    
 <link rel="stylesheet" type="text/css"
      href="//cdn.jsdelivr.net/bootstrap/latest/css/bootstrap.css"
 />
+    
+<script type="text/javascript" 
+    src="//cdn.jsdelivr.net/bootstrap.daterangepicker/2/daterangepicker.js"></script>
+
+
 
 <link rel="stylesheet" type="text/css"
  href="/static/js/node_modules/bootstrap-daterangepicker/daterangepicker.css"
@@ -14,11 +30,6 @@
 <link rel="stylesheet" type="text/css"
     href="/static/css/busy.css"
 />
-
-<!-- jquery from a content distribution network; probably cached -->
-<script type="text/javascript"
-     src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js">
-</script>
 
 
 <!-- The rest of our javascript dependencies are bundled and -->
@@ -32,13 +43,9 @@
 <body>
 <div class="container">
 
+<h1>Meeting Scheduler</h1>
 <h1>Busy times</h1>
 
-<!--
-  -- If there are any warnings or other messages from a prior action,
-  -- they appear above the rest of the content, just until the next 
-  -- action.
-  -->
 
 {% with messages = get_flashed_messages() %}
   {% if messages %}
@@ -51,6 +58,7 @@
 {% endwith %}
 
 <h2>Date range</h2>
+<p><b>Please enter a date range.</b></p>
   <form action="/setrange" method="post">
   <input type="text" name="daterange" size="12"
     {% if session.daterange is defined %}
@@ -76,7 +84,36 @@
     });
   </script>
 
-<br /><input type="submit" value="Choose" />
+  <h2>Time range</h2>
+  <p><b>Please enter a time range. Time is in 24-hour format: HH:mm - HH:mm</b></p>
+  <div class="row">
+    <div class="col-md-2">
+        <p>Start of Time Range:</p>
+    </div>
+    
+    <div class="col-md-3">
+        <input type="text" name="starttime" size="12"
+        {% if session.text_beg_time is defined %}
+         value="{{session.text_beg_time}}"
+        {% endif %} >
+    </div>
+  </div>
+  
+  <div class="row">
+    <div class="col-md-2">
+       <p>End of Time Range:</p>
+    </div>
+    
+    <div class="col-md-3">
+          <input type="text" name="endtime" size="12"
+        {% if session.text_end_time is defined %}
+         value="{{session.text_end_time}}"
+        {% endif %} >
+    </div>
+  </div>
+  
+  
+<br /><input type="submit" value="Continue To Choose Calendars" />
 </form>
 
     <!--
@@ -86,18 +123,76 @@
     prefer down then across). 
     -->
 {% if session.calendars is defined  %}
+<h2>Please Select The Calendars To Be Used</h2>
   <div class="row">
   {% for cal in session.calendars if cal.selected %}
           <div class="col-md-4">
-	   {{ cal.summary }}
+	   <input id="{{cal.id}}" type="checkbox"> {{ cal.summary }}
           </div>
          {% if loop.index is divisibleby 3 %}
           </div> <div class="row">
          {% endif %}
   {% endfor %}
   </div>
+
+<button onclick="CalcBusyTimes()">Calculate Busy Times</button>
+
+{% if session.selected_cal is defined %}
+    <script>
+    window.onload = function(){
+    for (id in {{session.selected_cal|safe}})
+    {document.getElementById(id).checked = true;}
+    };
+    </script>
 {% endif %}
+
+
+{% endif %}
+
+
+{% if session.display_total_busy is defined %}
+<h2>Avoiding Conflicts With:</h2>
+    {% for conflict_event in session.display_total_busy %}
+    <div class="row">
+      <div class="col-md-6">  
+        {{conflict_event}}
+      </div>
+    </div>
+    {% endfor %}
+{% endif %}
+
+
     
 
   </div>  <!-- container (for bootstrap) -->
+  
+  
+<script>
+$SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
+
+
+function CalcBusyTimes(){
+    selected_cal = "";
+    $('input[type=checkbox]').each(function () {
+       if (this.checked)
+       {
+            console.log(this.id);
+            selected_cal = selected_cal + " " + this.id
+       }
+  });
+  
+  console.log(selected_cal);
+  
+    $.ajax({
+    dataType: "json",
+    url: $SCRIPT_ROOT + '/calcBusyTimes',
+    data: {selected: selected_cal},
+    complete: function(){ 
+            location.assign($SCRIPT_ROOT + '/displayBusyTimes'); }
+    });
+}
+
+
+</script>
+
   </body> </html>

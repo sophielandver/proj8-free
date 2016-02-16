@@ -181,20 +181,105 @@ def oauth2callback():
 def setrange():
     """
     User chose a date range with the bootstrap daterange
-    widget.
+    widget. Take in time range also
     """
     app.logger.debug("Entering setrange")  
     flask.flash("Setrange gave us '{}'".format(
       request.form.get('daterange')))
     daterange = request.form.get('daterange')
+    starttime = request.form.get('starttime')
+    endtime = request.form.get('endtime')
     flask.session['daterange'] = daterange
+    flask.session['text_beg_time'] = starttime
+    flask.session['text_end_time'] = endtime
     daterange_parts = daterange.split()
     flask.session['begin_date'] = interpret_date(daterange_parts[0])
     flask.session['end_date'] = interpret_date(daterange_parts[2])
+    flask.session['begin_time'] = interpret_time(starttime)
+    flask.session['end_time'] = interpret_time(endtime)
+    
     app.logger.debug("Setrange parsed {} - {}  dates as {} - {}".format(
       daterange_parts[0], daterange_parts[1], 
       flask.session['begin_date'], flask.session['end_date']))
+    app.logger.debug("Set time range from {} - {} TO {} - {}".format(starttime, endtime, flask.session['begin_time'], flask.session['end_time']))
     return flask.redirect(flask.url_for("choose"))
+
+
+@app.route('/calcBusyTimes')
+def calcBusyTimes():
+    temp_selected_cal = request.args.get('selected', 0, type=str)
+    selected_cal = temp_selected_cal.split() #list of strings
+    flask.session['selected_cal'] = selected_cal
+    app.logger.debug(flask.session['selected_cal'])
+    find_busy() #a dict of dicts  
+    return "nothing"
+
+@app.route('/displayBusyTimes')
+def displayBusyTimes():
+    display_total_busy = [] #list of strings
+    for cal in flask.session['total_busy']:
+        cal_dict = flask.session['total_busy'][cal]
+        app.logger.debug(cal_dict)
+        for conflict_event in cal_dict:
+            busy_str = ""
+            info_list = cal_dict[conflict_event]
+            app.logger.debug(info_list)
+            busy_str = busy_str + (info_list[0]) + ": "
+            busy_str = busy_str + (arrow.get(info_list[1]).format('MM/DD/YYYY HH:mm')) + " -  "
+            busy_str = busy_str + (arrow.get(info_list[2]).format('MM/DD/YYYY HH:mm'))
+            display_total_busy.append(busy_str)
+    app.logger.debug(display_total_busy)
+    flask.session['display_total_busy'] = display_total_busy
+    return render_template('index.html')
+            
+
+    
+def find_busy():
+    total_busy = {} #dictionary of dicts  
+    credentials =  credentials = client.OAuth2Credentials.from_json(flask.session['credentials'])
+    service = get_gcal_service(credentials)
+    for id in flask.session['selected_cal']:
+        events = service.events().list(calendarId=id, pageToken=None).execute()
+        event_dict = {}
+        for event in events['items']:
+            app.logger.debug(event['summary'])
+            app.logger.debug(arrow.get(event['start']['dateTime']))
+            app.logger.debug(arrow.get(event['end']['dateTime']))
+            
+            start_datetime = arrow.get(event['start']['dateTime'])
+            end_datetime = arrow.get(event['end']['dateTime'])
+            if overlap(start_datetime, end_datetime):   
+                event_dict[event['id']] = [event['summary'], start_datetime.isoformat(), end_datetime.isoformat()]
+        total_busy[id] = event_dict
+    
+    app.logger.debug(total_busy)
+    flask.session['total_busy'] = total_busy
+    app.logger.debug("HERE")
+    app.logger.debug(flask.session['total_busy'])
+
+
+def overlap(event_sdt, event_edt):
+#sdt = start date time 
+#edt = end date time 
+    event_sd = event_sdt.date()
+    event_ed = event_edt.date()
+    event_st = event_sdt.time()
+    event_et = event_edt.time()
+    desired_sd= arrow.get(flask.session['begin_date']).date()
+    desired_ed = arrow.get(flask.session['end_date']).date()
+    desired_st = arrow.get(flask.session['begin_time']).time()
+    desired_et = arrow.get(flask.session['end_time']).time()
+    if not (desired_sd <= event_sd <= desired_ed) or not (desired_sd <= event_ed <= desired_ed):
+        return False 
+    elif (event_et <= desired_st):
+        return False 
+    elif (event_st >= desired_et):
+        return False
+    else:
+        return True
+
+            
+
 
 ####
 #
@@ -280,6 +365,7 @@ def list_calendars(service):
     for cal in calendar_list:
         kind = cal["kind"]
         id = cal["id"]
+        app.logger.debug("HERE IS CALENDAR ID: {}". format(id))
         if "description" in cal: 
             desc = cal["description"]
         else:
