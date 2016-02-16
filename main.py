@@ -225,14 +225,24 @@ def displayBusyTimes():
             info_list = cal_dict[conflict_event]
             app.logger.debug(info_list)
             busy_str = busy_str + (info_list[0]) + ": "
-            busy_str = busy_str + (arrow.get(info_list[1]).format('MM/DD/YYYY HH:mm')) + " -  "
-            busy_str = busy_str + (arrow.get(info_list[2]).format('MM/DD/YYYY HH:mm'))
+            busy_str = busy_str + convertDisplayDateTime(info_list[1]) + " -  "
+            busy_str = busy_str + convertDisplayDateTime(info_list[2])
             display_total_busy.append(busy_str)
     app.logger.debug(display_total_busy)
     flask.session['display_total_busy'] = display_total_busy
     return render_template('index.html')
             
 
+def convertDisplayDateTime(date_time):
+    """
+    Takes in an isoformat() string and makes it into an arrow and then converts it to the 
+    local time of the server and then returns it as a formatted string for displaying in the
+    form MM/DD/YYYY HH:mm. this is what you do to a date time every time before you display it. 
+    """
+    arrow_date_time = arrow.get(date_time)
+    local_arrow = arrow_date_time.to('local')
+    formatted_str = local_arrow.format('MM/DD/YYYY HH:mm')
+    return formatted_str
     
 def find_busy():
     total_busy = {} #dictionary of dicts  
@@ -242,6 +252,8 @@ def find_busy():
         events = service.events().list(calendarId=id, pageToken=None).execute()
         event_dict = {}
         for event in events['items']:
+            if ('transparency' in event) and event['transparency']=='transparent':
+                continue 
             app.logger.debug(event['summary'])
             app.logger.debug(arrow.get(event['start']['dateTime']))
             app.logger.debug(arrow.get(event['end']['dateTime']))

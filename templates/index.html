@@ -83,6 +83,7 @@
        );
     });
   </script>
+  
 
   <h2>Time range</h2>
   <p><b>Please enter a time range. Time is in 24-hour format: HH:mm - HH:mm</b></p>
@@ -135,17 +136,8 @@
   {% endfor %}
   </div>
 
+
 <button onclick="CalcBusyTimes()">Calculate Busy Times</button>
-
-{% if session.selected_cal is defined %}
-    <script>
-    window.onload = function(){
-    for (id in {{session.selected_cal|safe}})
-    {document.getElementById(id).checked = true;}
-    };
-    </script>
-{% endif %}
-
 
 {% endif %}
 
