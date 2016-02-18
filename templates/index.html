@@ -11,18 +11,18 @@
     
 
 
-        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-        <link rel="stylesheet"
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link rel="stylesheet"
  href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css"
  integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7"
   crossorigin="anonymous">
-    <script
-    src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"
-    integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS"
-    crossorigin="anonymous">
-    </script>
-    <link type="text/css" href="static/js/node_modules/bootstrap-timepicker/css/bootstrap-timepicker.min.css" />
-    <script type="text/javascript" src="static/js/node_modules/bootstrap-timepicker/js/bootstrap-timepicker.min.js"></script>
+<script
+src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"
+integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS"
+crossorigin="anonymous">
+</script>
+<link type="text/css" href="static/js/node_modules/bootstrap-timepicker/css/bootstrap-timepicker.min.css" />
+<script type="text/javascript" src="static/js/node_modules/bootstrap-timepicker/js/bootstrap-timepicker.min.js"></script>
 
 
 
@@ -49,11 +49,6 @@
 />
 
 
-<!-- The rest of our javascript dependencies are bundled and -->
-<!-- 'minified' by 'browserify'  -->
-<script type="text/javascript" 
-   src="/static/js/busy.min.js">
-</script>
 
 </head>
 
@@ -104,14 +99,13 @@
 
 
 <h2>Time range</h2>
-<p><b>Please enter a time range.</b></p>
+<p><b>Please enter a time range. You may use your arrow buttons to choose an hour, minutes, and AM or PM.</b></p>
 <p>Start of Time Range:</p>
 <div class="input-group bootstrap-timepicker timepicker">
     <input id="timepicker1" name="starttime" type="text" class="form-control input-small" 
     {% if session.text_beg_time is defined %}
          value="{{session.text_beg_time}}"
     {% endif %}>
-    <span class="input-group-addon"><i class="glyphicon glyphicon-time"></i></span>
 </div>
  <script type="text/javascript">
         $('#timepicker1').timepicker();
@@ -124,7 +118,6 @@
     {% if session.text_end_time is defined %}
          value="{{session.text_end_time}}"
     {% endif %}>
-    <span class="input-group-addon"><i class="glyphicon glyphicon-time"></i></span>
 </div>
  <script type="text/javascript">
         $('#timepicker2').timepicker();
