@@ -181,7 +181,12 @@ def oauth2callback():
 def setrange():
     """
     User chose a date range with the bootstrap daterange
-    widget. Take in time range also
+    widget and a time range with a time picker widget. This
+    function stores the begin date, end date, start time, and 
+    end time in the session object. It also stores the original
+    date range and time range in the session object as a simple
+    string so that it can be displayed to the user every time 
+    the page reloads. 
     """
     app.logger.debug("Entering setrange")  
     flask.flash("Setrange gave us '{}'".format(
@@ -190,7 +195,6 @@ def setrange():
     starttime = request.form.get('starttime')
     endtime = request.form.get('endtime')
     
-    app.logger.debug('HERE is starttime and endtime the way came in')
     app.logger.debug(starttime)
     app.logger.debug(endtime)
     
@@ -212,6 +216,13 @@ def setrange():
 
 @app.route('/calcBusyTimes')
 def calcBusyTimes():
+    """
+    Once the user has selected the google calendars he wants to use and clicks the 
+    'Calculate Busy Times' button this function gets invoked. This function stores in 
+    the session object a list of calendar ids, the calendar ids of the calendars the user
+    selected. Then, this function calls find_busy() which goes through the list of 
+    calendar ids and finds the times in the time span in which the user cannot meet.  
+    """
     temp_selected_cal = request.args.get('selected', 0, type=str)
     selected_cal = temp_selected_cal.split() #list of strings
     flask.session['selected_cal'] = selected_cal
@@ -221,6 +232,10 @@ def calcBusyTimes():
 
 @app.route('/displayBusyTimes')
 def displayBusyTimes():
+    """
+    This function gets called once the busy times have been calculated and we are 
+    ready to display them to the user. This function displays the busy times to the user.
+    """
     display_total_busy = [] #list of strings
     for cal in flask.session['total_busy']:
         cal_dict = flask.session['total_busy'][cal]
@@ -237,66 +252,6 @@ def displayBusyTimes():
     flask.session['display_total_busy'] = display_total_busy
     return render_template('index.html')
             
-
-def convertDisplayDateTime(date_time):
-    """
-    Takes in an isoformat() string and makes it into an arrow and then converts it to the 
-    local time of the server and then returns it as a formatted string for displaying in the
-    form MM/DD/YYYY HH:mm. this is what you do to a date time every time before you display it. 
-    """
-    arrow_date_time = arrow.get(date_time)
-    local_arrow = arrow_date_time.to('local')
-    formatted_str = local_arrow.format('MM/DD/YYYY h:mm A')
-    return formatted_str
-    
-def find_busy():
-    total_busy = {} #dictionary of dicts  
-    credentials =  credentials = client.OAuth2Credentials.from_json(flask.session['credentials'])
-    service = get_gcal_service(credentials)
-    for id in flask.session['selected_cal']:
-        events = service.events().list(calendarId=id, pageToken=None).execute()
-        event_dict = {}
-        for event in events['items']:
-            if ('transparency' in event) and event['transparency']=='transparent':
-                continue 
-            app.logger.debug(event['summary'])
-            app.logger.debug(arrow.get(event['start']['dateTime']))
-            app.logger.debug(arrow.get(event['end']['dateTime']))
-            
-            start_datetime = arrow.get(event['start']['dateTime'])
-            end_datetime = arrow.get(event['end']['dateTime'])
-            if overlap(start_datetime, end_datetime):   
-                event_dict[event['id']] = [event['summary'], start_datetime.isoformat(), end_datetime.isoformat()]
-        total_busy[id] = event_dict
-    
-    app.logger.debug(total_busy)
-    flask.session['total_busy'] = total_busy
-    app.logger.debug("HERE")
-    app.logger.debug(flask.session['total_busy'])
-
-
-def overlap(event_sdt, event_edt):
-#sdt = start date time 
-#edt = end date time 
-    event_sd = event_sdt.date()
-    event_ed = event_edt.date()
-    event_st = event_sdt.time()
-    event_et = event_edt.time()
-    desired_sd= arrow.get(flask.session['begin_date']).date()
-    desired_ed = arrow.get(flask.session['end_date']).date()
-    desired_st = arrow.get(flask.session['begin_time']).time()
-    desired_et = arrow.get(flask.session['end_time']).time()
-    if not (desired_sd <= event_sd <= desired_ed) or not (desired_sd <= event_ed <= desired_ed):
-        return False 
-    elif (event_et <= desired_st):
-        return False 
-    elif (event_st >= desired_et):
-        return False
-    else:
-        return True
-
-            
-
 
 ####
 #
@@ -366,7 +321,72 @@ def next_day(isotext):
 #  Functions (NOT pages) that return some information
 #
 ####
-  
+
+def find_busy():
+    """
+    This function goes through the list of selected calendar ids, which is stored in the 
+    session object, and collects all the appointments that lie within or partially overlap
+    the desired meeting time range and are not transparent. It stores all the busy times
+    it collects in the session object.  
+    """
+    total_busy = {} #dictionary of dicts  
+    credentials = client.OAuth2Credentials.from_json(flask.session['credentials'])
+    service = get_gcal_service(credentials)
+    for id in flask.session['selected_cal']:
+        events = service.events().list(calendarId=id, pageToken=None).execute()
+        event_dict = {}
+        for event in events['items']:
+            if ('transparency' in event) and event['transparency']=='transparent':
+                continue 
+            start_datetime = arrow.get(event['start']['dateTime'])
+            end_datetime = arrow.get(event['end']['dateTime'])
+            if overlap(start_datetime, end_datetime):   
+                event_dict[event['id']] = [event['summary'], start_datetime.isoformat(), end_datetime.isoformat()]
+        total_busy[id] = event_dict
+    
+    app.logger.debug(total_busy)
+    flask.session['total_busy'] = total_busy
+    app.logger.debug(flask.session['total_busy'])
+
+
+def overlap(event_sdt, event_edt):
+    """
+    This function returns true if and only if the inputed event overlaps the 
+    desired meeting time range. 
+    """
+#sdt = start date time 
+#edt = end date time 
+    event_sd = event_sdt.date()
+    event_ed = event_edt.date()
+    event_st = event_sdt.time()
+    event_et = event_edt.time()
+    desired_sd= arrow.get(flask.session['begin_date']).date()
+    desired_ed = arrow.get(flask.session['end_date']).date()
+    desired_st = arrow.get(flask.session['begin_time']).time()
+    desired_et = arrow.get(flask.session['end_time']).time()
+    if not (desired_sd <= event_sd <= desired_ed) or not (desired_sd <= event_ed <= desired_ed):
+        return False 
+    elif (event_et <= desired_st):
+        return False 
+    elif (event_st >= desired_et):
+        return False
+    else:
+        return True
+
+
+def convertDisplayDateTime(date_time):
+    """
+    This function takes in an isoformat() string, makes it into an arrow object, converts it to the 
+    local time of the server, and then returns it as a formatted string for displaying in the
+    form MM/DD/YYYY h:mm A. We use this function every time before we want to display a time 
+    to the user.
+    """
+    arrow_date_time = arrow.get(date_time)
+    local_arrow = arrow_date_time.to('local')
+    formatted_str = local_arrow.format('MM/DD/YYYY h:mm A')
+    return formatted_str
+
+
 def list_calendars(service):
     """
     Given a google 'service' object, return a list of
