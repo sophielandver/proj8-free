@@ -189,6 +189,11 @@ def setrange():
     daterange = request.form.get('daterange')
     starttime = request.form.get('starttime')
     endtime = request.form.get('endtime')
+    
+    app.logger.debug('HERE is starttime and endtime the way came in')
+    app.logger.debug(starttime)
+    app.logger.debug(endtime)
+    
     flask.session['daterange'] = daterange
     flask.session['text_beg_time'] = starttime
     flask.session['text_end_time'] = endtime
@@ -241,7 +246,7 @@ def convertDisplayDateTime(date_time):
     """
     arrow_date_time = arrow.get(date_time)
     local_arrow = arrow_date_time.to('local')
-    formatted_str = local_arrow.format('MM/DD/YYYY HH:mm')
+    formatted_str = local_arrow.format('MM/DD/YYYY h:mm A')
     return formatted_str
     
 def find_busy():
@@ -325,7 +330,7 @@ def interpret_time( text ):
     case it will also flash a message explaining accepted formats.
     """
     app.logger.debug("Decoding time '{}'".format(text))
-    time_formats = ["ha", "h:mma",  "h:mm a", "H:mm"]
+    time_formats = ["ha", "h:mma",  "h:mm a", "h:mm A", "H:mm"]
     try: 
         as_arrow = arrow.get(text, time_formats).replace(tzinfo=tz.tzlocal())
         app.logger.debug("Succeeded interpreting time")
