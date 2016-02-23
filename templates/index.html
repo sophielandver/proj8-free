@@ -137,21 +137,23 @@ crossorigin="anonymous">
   </div>
 
 
-<button onclick="CalcBusyTimes()">Calculate Busy Times</button>
+<button onclick="CalcBusyFreeTimes()">Calculate Busy & Free Times</button>
 
 {% endif %}
 
 
-{% if session.display_total_busy is defined %}
-<h2>Avoiding Conflicts With:</h2>
-    {% for conflict_event in session.display_total_busy %}
+
+{% if session.display_free_busy is defined %}
+<h2>Blocked and Available Times:</h2>
+    {% for apt in session.display_free_busy %}
     <div class="row">
       <div class="col-md-6">  
-        {{conflict_event}}
+        {{apt}}
       </div>
     </div>
     {% endfor %}
 {% endif %}
+
 
 
     
@@ -163,7 +165,7 @@ crossorigin="anonymous">
 $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
 
 
-function CalcBusyTimes(){
+function CalcBusyFreeTimes(){
     selected_cal = "";
     $('input[type=checkbox]').each(function () {
        if (this.checked)
@@ -177,10 +179,10 @@ function CalcBusyTimes(){
   
     $.ajax({
     dataType: "json",
-    url: $SCRIPT_ROOT + '/calcBusyTimes',
+    url: $SCRIPT_ROOT + '/calcBusyFreeTimes',
     data: {selected: selected_cal},
     complete: function(){ 
-            location.assign($SCRIPT_ROOT + '/displayBusyTimes'); }
+            location.assign($SCRIPT_ROOT + '/displayBusyFreeTimes'); }
     });
 }
 

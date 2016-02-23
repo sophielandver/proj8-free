@@ -20,6 +20,8 @@ import httplib2   # used in oauth2 flow
 # Google API for services 
 from apiclient import discovery
 
+from agenda import *
+
 ###
 # Globals
 ###
@@ -214,8 +216,8 @@ def setrange():
     return flask.redirect(flask.url_for("choose"))
 
 
-@app.route('/calcBusyTimes')
-def calcBusyTimes():
+@app.route('/calcBusyFreeTimes')
+def calcBusyFreeTimes():
     """
     Once the user has selected the google calendars he wants to use and clicks the 
     'Calculate Busy Times' button this function gets invoked. This function stores in 
@@ -227,15 +229,57 @@ def calcBusyTimes():
     selected_cal = temp_selected_cal.split() #list of strings
     flask.session['selected_cal'] = selected_cal
     app.logger.debug(flask.session['selected_cal'])
-    find_busy() #a dict of dicts  
+    find_busy() #a dict of dicts 
+    find_free() 
     return "nothing"
 
-@app.route('/displayBusyTimes')
-def displayBusyTimes():
+@app.route('/displayBusyFreeTimes')
+def displayBusyFreeTimes():
     """
     This function gets called once the busy times have been calculated and we are 
     ready to display them to the user. This function displays the busy times to the user.
     """
+    """
+    createDisplayBusyTimes()
+    createDisplayFreeTimes(flask.session['free_apts'])
+    """
+    createDisplayFreeBusyTimes()
+    return render_template('index.html')
+    
+
+def createDisplayFreeBusyTimes():
+    free_busy = []
+    for event in flask.session['busy_list']:
+        del event[0] #delete the event ID
+        free_busy.append(event)
+    for free in flask.session['free_apts']:
+        free.insert(0, "Available")
+        free_busy.append(free)
+    free_busy.sort(key=lambda r: r[1]) #sort by begin date
+    
+    display_free_busy = []
+    for apt in free_busy:
+        apt_str = ""
+        apt_str = apt_str + apt[0] + ": "
+        apt_str = apt_str + convertDisplayDateTime(apt[1]) + " - "
+        apt_str = apt_str + convertDisplayDateTime(apt[2]) 
+        display_free_busy.append(apt_str)
+    flask.session['display_free_busy'] = display_free_busy
+        
+    
+#NOT USING THIS
+def createDisplayFreeTimes(free_apts): #given particular list of list free [["gym", arrow iso start date time, arrow iso end date time],...]
+    display_free = [] 
+    for apt in free_apts:
+        free_str = ""
+        free_str = free_str + convertDisplayDateTime(apt[0]) + " - "
+        free_str = free_str + convertDisplayDateTime(apt[1]) 
+        display_free.append(free_str)
+    app.logger.debug(display_free)
+    flask.session['display_total_free'] = display_free
+    
+#NOT USING THIS
+def createDisplayBusyTimes(): #given particular dictionary total_busy
     display_total_busy = [] #list of strings
     for cal in flask.session['total_busy']:
         cal_dict = flask.session['total_busy'][cal]
@@ -250,7 +294,6 @@ def displayBusyTimes():
             display_total_busy.append(busy_str)
     app.logger.debug(display_total_busy)
     flask.session['display_total_busy'] = display_total_busy
-    return render_template('index.html')
             
 
 ####
@@ -322,6 +365,57 @@ def next_day(isotext):
 #
 ####
 
+def find_free():
+    busy_agenda = Agenda.from_list(flask.session['busy_list'])
+        
+    span_begin_date = arrow.get(flask.session['begin_date'])
+    span_end_date = arrow.get(flask.session['end_date'])
+    span_begin_time = arrow.get(flask.session['begin_time'])
+    span_end_time = arrow.get(flask.session['end_time'])
+    free_agenda = busy_agenda.complementTimeSpan(span_begin_date, span_end_date, span_begin_time, span_end_time)
+    
+    flask.session['free_apts'] = free_agenda.to_list()
+
+
+
+
+"""
+def find_free():
+    busy_agenda = Agenda()
+    for event in flask.session['busy_list']:
+        apt = Appt.from_list(event)
+        busy_agenda.append(apt)
+        
+    free_times = []
+    flask_beg_date = arrow.get(flask.session['begin_date'])
+    date = flask_beg_date.date()
+    end_date = arrow.get(flask.session['end_date']).date()
+    while(date <= end_date):
+        app.logger.debug("here is date from while loop")
+        app.logger.debug(date)
+        fb_year = date.year
+        fb_month = date.month
+        fb_day = date.day
+        fb_begin = arrow.get(flask.session['begin_time']).replace(year=fb_year, month=fb_month, day=fb_day)
+        fb_end = arrow.get(flask.session['end_time']).replace(year=fb_year, month=fb_month, day=fb_day)
+        app.logger.debug("here is free block begin of apt")
+        app.logger.debug(fb_begin)
+        freeblock = Appt(fb_begin, fb_end, "freeblock")
+        free_agenda = busy_agenda.complement(freeblock)
+        for apt in free_agenda:
+            apt_list = apt.to_list()
+            free_times.append(apt_list)
+        
+        flask_beg_date = flask_beg_date.replace(days=+1)
+        date = flask_beg_date.date()
+    
+    app.logger.debug("here is all free times")
+    app.logger.debug(free_times)
+    flask.session['free_apts'] = free_times
+
+"""
+    
+
 def find_busy():
     """
     This function goes through the list of selected calendar ids, which is stored in the 
@@ -330,6 +424,7 @@ def find_busy():
     it collects in the session object.  
     """
     total_busy = {} #dictionary of dicts  
+    busy_list = [] #list of lists
     credentials = client.OAuth2Credentials.from_json(flask.session['credentials'])
     service = get_gcal_service(credentials)
     for id in flask.session['selected_cal']:
@@ -342,10 +437,17 @@ def find_busy():
             end_datetime = arrow.get(event['end']['dateTime'])
             if overlap(start_datetime, end_datetime):   
                 event_dict[event['id']] = [event['summary'], start_datetime.isoformat(), end_datetime.isoformat()]
+                event_list = [event['id'], event['summary'], start_datetime.isoformat(), end_datetime.isoformat()]
+                app.logger.debug("here is event_list of busy_list")
+                app.logger.debug(event_list)
+                busy_list.append(event_list)
         total_busy[id] = event_dict
     
+    app.logger.debug("HERE is busy list")
+    app.logger.debug(busy_list)
     app.logger.debug(total_busy)
     flask.session['total_busy'] = total_busy
+    flask.session['busy_list'] = busy_list
     app.logger.debug(flask.session['total_busy'])
 
 
