@@ -220,80 +220,60 @@ def setrange():
 def calcBusyFreeTimes():
     """
     Once the user has selected the google calendars he wants to use and clicks the 
-    'Calculate Busy Times' button this function gets invoked. This function stores in 
+    'Calculate Busy & Free Times' button this function gets invoked. This function stores in 
     the session object a list of calendar ids, the calendar ids of the calendars the user
     selected. Then, this function calls find_busy() which goes through the list of 
-    calendar ids and finds the times in the time span in which the user cannot meet.  
+    calendar ids and finds the times in the time span in which the user cannot meet. In 
+    addition, this function calls find_free which finds the times in the time span in which
+    the user can meet.  
     """
-    temp_selected_cal = request.args.get('selected', 0, type=str)
-    selected_cal = temp_selected_cal.split() #list of strings
+    selected_cal = request.args.getlist("selected[]")
     flask.session['selected_cal'] = selected_cal
     app.logger.debug(flask.session['selected_cal'])
-    find_busy() #a dict of dicts 
-    find_free() 
+    find_busy() #a list of dicts. Finds busy_list
+    find_free() #a list of dicts. Finds free_list
     return "nothing"
 
 @app.route('/displayBusyFreeTimes')
 def displayBusyFreeTimes():
     """
-    This function gets called once the busy times have been calculated and we are 
-    ready to display them to the user. This function displays the busy times to the user.
-    """
-    """
-    createDisplayBusyTimes()
-    createDisplayFreeTimes(flask.session['free_apts'])
+    This function gets called once the busy and free times have been calculated and we are 
+    ready to display them to the user. This function displays the busy and free times to 
+    the user in sorted order by begin date/time.
     """
     createDisplayFreeBusyTimes()
     return render_template('index.html')
     
 
 def createDisplayFreeBusyTimes():
+    """
+    This function puts together a list of strings for displaying the busy and free times in 
+    order by begin date/time. 
+    """
     free_busy = []
-    for event in flask.session['busy_list']:
-        del event[0] #delete the event ID
-        free_busy.append(event)
-    for free in flask.session['free_apts']:
-        free.insert(0, "Available")
-        free_busy.append(free)
-    free_busy.sort(key=lambda r: r[1]) #sort by begin date
+    for busy_dict in flask.session['busy_list']:
+        free_busy.append(busy_dict)
+    for free_dict in flask.session['free_list']:
+        free_busy.append(free_dict)
+    free_busy.sort(key=lambda r: r['begin']) #sort by begin date    
     
-    display_free_busy = []
-    for apt in free_busy:
+    flask.session['display_free_busy'] = createDisplayAptList(free_busy)
+
+
+def createDisplayAptList(apt_list):
+    """
+    This function takes in a list of appointments and returns a list of strings representing
+    the appointments, where the strings are suited for displaying the appointments to the user. 
+    """
+    display_apt_list = []
+    for apt in apt_list:
         apt_str = ""
-        apt_str = apt_str + apt[0] + ": "
-        apt_str = apt_str + convertDisplayDateTime(apt[1]) + " - "
-        apt_str = apt_str + convertDisplayDateTime(apt[2]) 
-        display_free_busy.append(apt_str)
-    flask.session['display_free_busy'] = display_free_busy
+        apt_str = apt_str + apt['desc'] + ": "
+        apt_str = apt_str + convertDisplayDateTime(apt['begin']) + " - "
+        apt_str = apt_str + convertDisplayDateTime(apt['end']) 
+        display_apt_list.append(apt_str)
+    return display_apt_list
         
-    
-#NOT USING THIS
-def createDisplayFreeTimes(free_apts): #given particular list of list free [["gym", arrow iso start date time, arrow iso end date time],...]
-    display_free = [] 
-    for apt in free_apts:
-        free_str = ""
-        free_str = free_str + convertDisplayDateTime(apt[0]) + " - "
-        free_str = free_str + convertDisplayDateTime(apt[1]) 
-        display_free.append(free_str)
-    app.logger.debug(display_free)
-    flask.session['display_total_free'] = display_free
-    
-#NOT USING THIS
-def createDisplayBusyTimes(): #given particular dictionary total_busy
-    display_total_busy = [] #list of strings
-    for cal in flask.session['total_busy']:
-        cal_dict = flask.session['total_busy'][cal]
-        app.logger.debug(cal_dict)
-        for conflict_event in cal_dict:
-            busy_str = ""
-            info_list = cal_dict[conflict_event]
-            app.logger.debug(info_list)
-            busy_str = busy_str + (info_list[0]) + ": "
-            busy_str = busy_str + convertDisplayDateTime(info_list[1]) + " -  "
-            busy_str = busy_str + convertDisplayDateTime(info_list[2])
-            display_total_busy.append(busy_str)
-    app.logger.debug(display_total_busy)
-    flask.session['display_total_busy'] = display_total_busy
             
 
 ####
@@ -366,6 +346,12 @@ def next_day(isotext):
 ####
 
 def find_free():
+    """
+    This function takes flask.session['busy_list'], flask.session['begin_date], flask.session['end_date'], 
+    flask.session['begin_time'], and flask.session['end_time'] and computes the free times in which the
+    user can meet within the date and time range and stores these free times in flask.session['free_list']
+    as a list of dictionaries.  
+    """
     busy_agenda = Agenda.from_list(flask.session['busy_list'])
         
     span_begin_date = arrow.get(flask.session['begin_date'])
@@ -374,87 +360,41 @@ def find_free():
     span_end_time = arrow.get(flask.session['end_time'])
     free_agenda = busy_agenda.complementTimeSpan(span_begin_date, span_end_date, span_begin_time, span_end_time)
     
-    flask.session['free_apts'] = free_agenda.to_list()
+    flask.session['free_list'] = free_agenda.to_list()
+    app.logger.debug("HERE IS FREE_LIST")
+    app.logger.debug(flask.session['free_list'])
 
-
-
-
-"""
-def find_free():
-    busy_agenda = Agenda()
-    for event in flask.session['busy_list']:
-        apt = Appt.from_list(event)
-        busy_agenda.append(apt)
-        
-    free_times = []
-    flask_beg_date = arrow.get(flask.session['begin_date'])
-    date = flask_beg_date.date()
-    end_date = arrow.get(flask.session['end_date']).date()
-    while(date <= end_date):
-        app.logger.debug("here is date from while loop")
-        app.logger.debug(date)
-        fb_year = date.year
-        fb_month = date.month
-        fb_day = date.day
-        fb_begin = arrow.get(flask.session['begin_time']).replace(year=fb_year, month=fb_month, day=fb_day)
-        fb_end = arrow.get(flask.session['end_time']).replace(year=fb_year, month=fb_month, day=fb_day)
-        app.logger.debug("here is free block begin of apt")
-        app.logger.debug(fb_begin)
-        freeblock = Appt(fb_begin, fb_end, "freeblock")
-        free_agenda = busy_agenda.complement(freeblock)
-        for apt in free_agenda:
-            apt_list = apt.to_list()
-            free_times.append(apt_list)
-        
-        flask_beg_date = flask_beg_date.replace(days=+1)
-        date = flask_beg_date.date()
-    
-    app.logger.debug("here is all free times")
-    app.logger.debug(free_times)
-    flask.session['free_apts'] = free_times
-
-"""
-    
 
 def find_busy():
     """
     This function goes through the list of selected calendar ids, which is stored in the 
     session object, and collects all the appointments that lie within or partially overlap
     the desired meeting time range and are not transparent. It stores all the busy times
-    it collects in the session object.  
+    it collects in flask.session['busy_list'] as a list of dictionaries.  
     """
-    total_busy = {} #dictionary of dicts  
-    busy_list = [] #list of lists
+    busy_list = [] #list of dicts
     credentials = client.OAuth2Credentials.from_json(flask.session['credentials'])
     service = get_gcal_service(credentials)
     for id in flask.session['selected_cal']:
         events = service.events().list(calendarId=id, pageToken=None).execute()
-        event_dict = {}
         for event in events['items']:
             if ('transparency' in event) and event['transparency']=='transparent':
                 continue 
             start_datetime = arrow.get(event['start']['dateTime'])
             end_datetime = arrow.get(event['end']['dateTime'])
-            if overlap(start_datetime, end_datetime):   
-                event_dict[event['id']] = [event['summary'], start_datetime.isoformat(), end_datetime.isoformat()]
-                event_list = [event['id'], event['summary'], start_datetime.isoformat(), end_datetime.isoformat()]
-                app.logger.debug("here is event_list of busy_list")
-                app.logger.debug(event_list)
-                busy_list.append(event_list)
-        total_busy[id] = event_dict
+            if overlap(start_datetime, end_datetime): 
+                event_dict = {"desc":event['summary'], "begin":start_datetime.isoformat(), "end":end_datetime.isoformat()}
+                busy_list.append(event_dict)
     
     app.logger.debug("HERE is busy list")
     app.logger.debug(busy_list)
-    app.logger.debug(total_busy)
-    flask.session['total_busy'] = total_busy
     flask.session['busy_list'] = busy_list
-    app.logger.debug(flask.session['total_busy'])
 
 
 def overlap(event_sdt, event_edt):
     """
-    This function returns true if and only if the inputed event overlaps the 
-    desired meeting time range. 
+    This function returns true IFF the inputed event overlaps the desired meeting 
+    time and date range.
     """
 #sdt = start date time 
 #edt = end date time 

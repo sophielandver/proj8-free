@@ -166,12 +166,12 @@ $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
 
 
 function CalcBusyFreeTimes(){
-    selected_cal = "";
+    selected_cal = [];
     $('input[type=checkbox]').each(function () {
        if (this.checked)
        {
             console.log(this.id);
-            selected_cal = selected_cal + " " + this.id
+            selected_cal.push(this.id)
        }
   });
   

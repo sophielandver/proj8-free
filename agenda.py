@@ -1,16 +1,5 @@
-"""An Agenda is a list-like container of Appt (appointment).
-
-   Author: FIXME for CIS 210, U. Oregon
-
-   Each Appt has a date, a start time, an end time, and
-   a textual description.   They can be converted to and
-   from strings, using the from_string class method and the __str__
-   method.  An Agenda can be read from a file using the
-   from_file class method.  Intersecting Agendas produces
-   a new Agenda whose Appts are periods that are in the overlap
-   of Appts in the first and second Agenda.
-   
-
+"""
+An Agenda is a list-like container of Appt (appointment).
 """
 
 import datetime
@@ -25,27 +14,15 @@ class Appt:
     """
     
     def __init__(self, begin, end, desc):
-        """Create an appointment on date
-        from begin time to end time.
+        """Create an appointment.
         
         Arguments:
-            day:   A datetime.date object.  The appointment occurs this day.
-            begin: A datetime.time object.  When the appointment starts. 
-            end:  A datetime.time object, 
-                after begin.                When the appointments ends.
+            begin: An arrow date and time object. When the appointment starts. 
+            end:  An arrow date and time object, after begin. When the appointments ends.
             desc: A string describing the appointment
             
         Raises: 
         	ValueError if appointment ends before it begins
-        	
-        Example:
-            Appt( datetime.date(2012,12,1),
-                datetime.time(16,30),
-                datetime.time(17,45))
-            (December 1 from 4:30pm to 5:45pm)
-        NEW:
-            begin is an arrow datetime object so includes a date and a time
-            end is  an arrow datetime object so includes a date and a time
         """
         self.begin = begin
         self.end = end
@@ -56,33 +33,37 @@ class Appt:
 
 
     @classmethod
-    def from_list(cls, event_list):
+    def from_dict(cls, event_dict): #from an apt in the form of an item in busy_list or free_list; both lists are same form
         """
-        take a list representing a busy event like [event_id, "gym", arrow start date time, arrow end date time] 
-        and return an Appt object 
+        This function takes in a dictionary representation of an Appt and returns an Appt object 
+        for it. The dictionary representation has a "desc", "begin" and "end" term.  
         """
-        desc = event_list[1]
-        begin = arrow.get(event_list[2])
-        end = arrow.get(event_list[3])
+        desc = event_dict["desc"]
+        begin = arrow.get(event_dict["begin"])
+        end = arrow.get(event_dict["end"])
         return Appt(begin, end, desc)
-    
-    def to_list(self):
-        """
-        take an apt object and turn into into a list representation of the form [begin, end]
-        where begin and end are in isoformat 
-        """
-        list_rep = []
-        #list_rep.append(self.desc)
-        list_rep.append(self.begin.isoformat())
-        list_rep.append(self.end.isoformat())
-        return list_rep
-        
 
-    #REMOVE THE BELOW FUNCTION?
+   
+   
+    def to_dict(self):
+        """
+        This function takes in an Appt object and returns a dictionary representation of it where
+        the begin and end times of the appointment are stored in isoformat.
+        Returns a dictionary in the form {"desc": description_of_apt, "begin": isoformat_begin_date_time_of_apt,
+                                          "end": isoformat_end_date_time_of_apt}
+        """
+        dict_rep = {}
+        dict_rep["desc"] = self.desc
+        dict_rep["begin"] = self.begin.isoformat()
+        dict_rep["end"] = self.end.isoformat()
+        return dict_rep
+        
 
     @classmethod
     def from_string(cls, txt):
-        """Factory parses a string to create an Appt"""
+        """
+        This function takes in a string representation of an Appt and returns an Appt object. 
+        """
         fields = txt.split("|")
         if len(fields) != 2:
             raise ValueError("Appt literal requires exactly one '|' before description")
@@ -147,7 +128,6 @@ class Appt:
 			between self and other.   Description of returned Appt 
 			is copied from this (self), unless a non-null string is 
 			provided as desc. 
-        IF THEY OVERLAP THEN THEY ON THE SAME DAY
         """
         if desc=="":
             desc = self.desc
@@ -184,21 +164,16 @@ class Appt:
         end = max(self.end, other.end)
         return Appt(begin, end, desc)
 
-"""
+
     def __str__(self):
-        'String representation of appointment.
+        """Returns a string representation of appointment object.
         Example:
-            2012.10.31 13:00 13:50 | CIS 210 lecture
-            
-        This format is designed to be easily divided
-        into parts:  Split on '|', then split on whitespace,
-        then split date on '.' and times on ':'.
-        '
-        daystr = self.begin.date().strftime("%Y.%m.%d ")
-        begstr = self.begin.strftime("%H:%M ")
-        endstr = self.end.strftime("%H:%M ")
-        return daystr + begstr + endstr + "| " + self.desc
-"""
+            "10/31/2012 4:00 PM-10/31/2012 9:00 PM|Long dinner"
+        """
+        begstr = self.begin.format("MM/DD/YYYY h:mm A")
+        endstr = self.end.format("MM/DD/YYYY h:mm A")
+        return  begstr + "-" + endstr + "|" + self.desc
+
 
 class Agenda:
     """An Agenda is essentially a list of appointments,
@@ -213,21 +188,27 @@ class Agenda:
     
     @classmethod
     def from_list(cls, apt_list): #list of lists
+        """
+        Converts a list of dictionaries representing an agenda of appts into an agenda object
+        holding Appt objects. 
+        """
         total_agenda = Agenda()
         for apt in apt_list:
-            apt_obj = Appt.from_list(apt)
+            apt_obj = Appt.from_dict(apt)
             total_agenda.append(apt_obj)
         
         return total_agenda 
     
     def to_list(self):
+        """
+        Takes an agenda object and converts to a list of dictionaries. 
+        """
         apt_list = []
         for apt in self:
-            list_rep = apt.to_list()
-            apt_list.append(list_rep)
+            dict_rep = apt.to_dict()
+            apt_list.append(dict_rep)
         return apt_list
        
-    #REMOVE THE BELOW FUNCTION?
     @classmethod
     def from_file(cls, f):
         """Factory: Read an agenda from a file
@@ -346,12 +327,6 @@ class Agenda:
         """
         copy = self.normalized()
         comp = Agenda()
-        #day = freeblock.begin.date()
-        
-        fb_year = freeblock.begin.year
-        fb_month = freeblock.begin.month
-        fb_day = freeblock.begin.day
-        
         desc = freeblock.desc
         cur_time = freeblock.begin #arrow date and time 
         for appt in copy.appts:
@@ -359,21 +334,26 @@ class Agenda:
                 continue
             if appt > freeblock:
                 if cur_time < freeblock.end:
-                    comp.append(Appt(cur_time.replace(year=fb_year, month=fb_month, day=fb_day),freeblock.end.replace(year=fb_year, month=fb_month, day=fb_day), desc))
+                    comp.append(Appt(cur_time,freeblock.end, desc))
                     cur_time = freeblock.end
                 break
             if cur_time < appt.begin:
                 # print("Creating free time from", cur_time, "to", appt.begin)
-                comp.append(Appt(cur_time.replace(year=fb_year, month=fb_month, day=fb_day), appt.begin.replace(year=fb_year, month=fb_month, day=fb_day), desc))
+                comp.append(Appt(cur_time, appt.begin, desc))
             cur_time = max(appt.end,cur_time)
+        
         if cur_time < freeblock.end:
             # print("Creating final free time from", cur_time, "to", freeblock.end)
-            comp.append(Appt(cur_time.replace(year=fb_year, month=fb_month, day=fb_day), freeblock.end.replace(year=fb_year, month=fb_month, day=fb_day), desc))
+            comp.append(Appt(cur_time, freeblock.end, desc))
         return comp
 
     
     
     def complementTimeSpan(self, begin_date, end_date, begin_time, end_time):
+        """
+        Calculate the complement of an agenda within a date and time span. This method
+        calls the complement method per day in the date span. 
+        """
         total_free = Agenda()
         date = begin_date.date()
         end_date = end_date.date()
@@ -383,7 +363,7 @@ class Agenda:
             fb_day = date.day
             fb_begin = begin_time.replace(year=fb_year, month=fb_month, day=fb_day)
             fb_end = end_time.replace(year=fb_year, month=fb_month, day=fb_day)
-            freeblock = Appt(fb_begin, fb_end, "freeblock")
+            freeblock = Appt(fb_begin, fb_end, "Available")
             free_agenda = self.complement(freeblock)
             for apt in free_agenda:
                 total_free.append(apt)
@@ -393,9 +373,7 @@ class Agenda:
         
         return total_free
     
-    
-    
-    
+      
 
     def __len__(self):
         """Number of appointments, callable as built-in len() function"""
@@ -423,12 +401,5 @@ class Agenda:
                     mine.end == theirs.end):
                 return False
         return True
-
-
-        
-
-    
-    
-    
     
     
